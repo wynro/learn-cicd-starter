@@ -10,6 +10,8 @@ jobs:
   deploy:
     name: Deploy
     runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
     steps:
       - name: Check out code
@@ -19,6 +21,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: "1.25.1"
+
+      - name: Install goose
+        # For the DB migrations
+        run: go install github.com/pressly/goose/v3/cmd/goose@latest
 
       - name: Build executable
         run: ./scripts/buildprod.sh
@@ -36,6 +42,9 @@ jobs:
 
       - name: Build & Upload new image
         run: 'gcloud builds submit --tag ${{ vars.GCP_REPOSITORY }}:latest .'
+
+      - name: Apply the necessary DB migrations
+        run: ./scripts/migrateup.sh
 
       - name: Update deployment in Cloud Run
         run: 'gcloud run deploy notely --image ${{ vars.GCP_REPOSITORY }}:latest --region ${{ vars.GCP_REGION }} --allow-unauthenticated --project ${{ vars.GCP_PROJECT }} --max-instances=2'
